@@ -572,6 +572,8 @@ def main():
                 # 技術指標分析
                 st.markdown("### 技術指標詳細分析")
                 
+                tech_df = analyzer.calculate_technical_indicators()
+                
                 if len(tech_df) > 0:
                     # RSI 圖表
                     if show_rsi and 'RSI' in tech_df.columns:
@@ -648,6 +650,42 @@ def main():
                     col1, col2, col3 = st.columns(3)
                     
                     with col1:
+                        st.markdown("**價格指標**")
+                        st.write(f"收盤價: ${latest_data['Close']:.2f}")
+                        st.write(f"開盤價: ${latest_data['Open']:.2f}")
+                        st.write(f"最高價: ${latest_data['High']:.2f}")
+                        st.write(f"最低價: ${latest_data['Low']:.2f}")
+                    
+                    with col2:
+                        st.markdown("**移動平均**")
+                        if 'MA5' in tech_df.columns and pd.notna(latest_data['MA5']):
+                            st.write(f"MA5: ${latest_data['MA5']:.2f}")
+                        if 'MA20' in tech_df.columns and pd.notna(latest_data['MA20']):
+                            st.write(f"MA20: ${latest_data['MA20']:.2f}")
+                        if 'MA60' in tech_df.columns and pd.notna(latest_data['MA60']):
+                            st.write(f"MA60: ${latest_data['MA60']:.2f}")
+                    
+                    with col3:
+                        st.markdown("**技術指標**")
+                        if 'RSI' in tech_df.columns and pd.notna(latest_data['RSI']):
+                            rsi_value = latest_data['RSI']
+                            rsi_status = "超買" if rsi_value > 70 else "超賣" if rsi_value < 30 else "正常"
+                            st.write(f"RSI: {rsi_value:.2f} ({rsi_status})")
+                        
+                else:
+                    st.warning("無法計算技術指標")
+            
+            with tab3:
+                # 財務分析
+                st.markdown("### 💰 財務比率分析")
+                
+                # 取得所有財務比率
+                all_ratios = analyzer.calculate_financial_ratios()
+                
+                # 分類顯示
+                col1, col2 = st.columns(2)
+                
+                with col1:
                     st.markdown("**獲利能力指標**")
                     metrics_df = pd.DataFrame({
                         '指標': ['淨利率', 'ROE', 'ROA'],
@@ -805,42 +843,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-                        st.markdown("**價格指標**")
-                        st.write(f"收盤價: ${latest_data['Close']:.2f}")
-                        st.write(f"開盤價: ${latest_data['Open']:.2f}")
-                        st.write(f"最高價: ${latest_data['High']:.2f}")
-                        st.write(f"最低價: ${latest_data['Low']:.2f}")
-                    
-                    with col2:
-                        st.markdown("**移動平均**")
-                        if 'MA5' in tech_df.columns and pd.notna(latest_data['MA5']):
-                            st.write(f"MA5: ${latest_data['MA5']:.2f}")
-                        if 'MA20' in tech_df.columns and pd.notna(latest_data['MA20']):
-                            st.write(f"MA20: ${latest_data['MA20']:.2f}")
-                        if 'MA60' in tech_df.columns and pd.notna(latest_data['MA60']):
-                            st.write(f"MA60: ${latest_data['MA60']:.2f}")
-                    
-                    with col3:
-                        st.markdown("**技術指標**")
-                        if 'RSI' in tech_df.columns and pd.notna(latest_data['RSI']):
-                            rsi_value = latest_data['RSI']
-                            rsi_status = "超買" if rsi_value > 70 else "超賣" if rsi_value < 30 else "正常"
-                            st.write(f"RSI: {rsi_value:.2f} ({rsi_status})")
-                        
-                        if show_macd and 'MACD' in tech_df.columns and pd.notna(latest_data['MACD']):
-                            macd_signal = "買入訊號" if latest_data['MACD'] > latest_data['Signal'] else "賣出訊號"
-                            st.write(f"MACD: {macd_signal}")
-                else:
-                    st.warning("無法計算技術指標")
-            
-            with tab3:
-                # 財務分析
-                st.markdown("### 💰 財務比率分析")
-                
-                # 取得所有財務比率
-                all_ratios = analyzer.calculate_financial_ratios()
-                
-                # 分類顯示
-                col1, col2 = st.columns(2)
-                
-                with col1:
