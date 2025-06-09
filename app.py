@@ -305,139 +305,126 @@ def main():
                 st.markdown(f"**產業:** {analyzer.info.get('industry', 'N/A')} | "
                           f"**部門:** {analyzer.info.get('sector', 'N/A')}")
             
-            # 關鍵指標卡片
-            st.markdown("### 📊 關鍵指標")
-            
-            # 先確保有歷史數據
-            if len(analyzer.hist) == 0:
-                st.warning("無法取得股價數據，請檢查股票代碼")
-                return
-                
-            # 先計算財務比率
-            try:
-                ratios = analyzer.calculate_financial_ratios()
-            except Exception as e:
-                st.warning(f"計算財務比率時發生錯誤: {e}")
-                ratios = {}
-            
-            # 建立六個欄位 - 修正指標顯示
-            metrics_cols = st.columns(6)
-            
-            # 指標 1: 現價
-            with metrics_cols[0]:
-                try:
-                    if not analyzer.hist.empty:
-                        current_price = analyzer.hist['Close'].iloc[-1]
-                        if len(analyzer.hist) > 1:
-                            prev_close = analyzer.hist['Close'].iloc[-2]
-                            price_change = current_price - prev_close
-                            price_change_pct = (price_change / prev_close) * 100 if prev_close != 0 else 0
-                        else:
-                            price_change_pct = 0
-                        
-                        st.metric(
-                            "現價",
-                            f"${current_price:.2f}",
-                            f"{price_change_pct:+.2f}%" if price_change_pct != 0 else "0.00%"
-                        )
-                    else:
-                        st.metric("現價", "N/A", "0.00%")
-                except Exception as e:
-                    st.metric("現價", "載入中...", "--")
-            
-            # 指標 2: 本益比
-            with metrics_cols[1]:
-                try:
-                    pe_ratio = analyzer.info.get('trailingPE', None)
-                    if pe_ratio and not pd.isna(pe_ratio) and pe_ratio > 0:
-                        st.metric("本益比 (P/E)", f"{pe_ratio:.2f}")
-                    else:
-                        # 嘗試從 ratios 取得
-                        pe_from_ratios = ratios.get('P/E', None)
-                        if pe_from_ratios and not pd.isna(pe_from_ratios) and pe_from_ratios > 0:
-                            st.metric("本益比 (P/E)", f"{pe_from_ratios:.2f}")
-                        else:
-                            st.metric("本益比 (P/E)", "N/A")
-                except Exception as e:
-                    st.metric("本益比 (P/E)", "N/A")
-            
-            # 指標 3: 股價淨值比
-            with metrics_cols[2]:
-                try:
-                    pb_ratio = analyzer.info.get('priceToBook', None)
-                    if pb_ratio and not pd.isna(pb_ratio) and pb_ratio > 0:
-                        st.metric("股價淨值比 (P/B)", f"{pb_ratio:.2f}")
-                    else:
-                        # 嘗試從 ratios 取得
-                        pb_from_ratios = ratios.get('P/B', None)
-                        if pb_from_ratios and not pd.isna(pb_from_ratios) and pb_from_ratios > 0:
-                            st.metric("股價淨值比 (P/B)", f"{pb_from_ratios:.2f}")
-                        else:
-                            st.metric("股價淨值比 (P/B)", "N/A")
-                except Exception as e:
-                    st.metric("股價淨值比 (P/B)", "N/A")
-            
-            # 指標 4: ROE
-            with metrics_cols[3]:
-                try:
-                    roe = ratios.get('ROE', None)
-                    if roe and not pd.isna(roe):
-                        st.metric("ROE", f"{roe:.1f}%")
-                    else:
-                        # 嘗試從 info 直接取得
-                        roe_info = analyzer.info.get('returnOnEquity', None)
-                        if roe_info and not pd.isna(roe_info):
-                            st.metric("ROE", f"{roe_info*100:.1f}%")
-                        else:
-                            st.metric("ROE", "N/A")
-                except Exception as e:
-                    st.metric("ROE", "N/A")
-            
-            # 指標 5: 股息率
-            with metrics_cols[4]:
-                try:
-                    dividend_yield = analyzer.info.get('dividendYield', None)
-                    if dividend_yield and not pd.isna(dividend_yield) and dividend_yield > 0:
-                        st.metric("股息率", f"{dividend_yield*100:.2f}%")
-                    else:
-                        # 嘗試其他欄位
-                        trailing_yield = analyzer.info.get('trailingAnnualDividendYield', None)
-                        if trailing_yield and not pd.isna(trailing_yield) and trailing_yield > 0:
-                            st.metric("股息率", f"{trailing_yield*100:.2f}%")
-                        else:
-                            dividend_rate = ratios.get('股息率', 0)
-                            st.metric("股息率", f"{dividend_rate:.2f}%")
-                except Exception as e:
-                    st.metric("股息率", "0.00%")
-            
-            # 指標 6: 市值
-            with metrics_cols[5]:
-                try:
-                    market_cap = analyzer.info.get('marketCap', None)
-                    if market_cap and market_cap > 0:
-                        if market_cap >= 1e12:
-                            st.metric("市值", f"${market_cap/1e12:.2f}T")
-                        elif market_cap >= 1e9:
-                            st.metric("市值", f"${market_cap/1e9:.2f}B")
-                        elif market_cap >= 1e6:
-                            st.metric("市值", f"${market_cap/1e6:.2f}M")
-                        else:
-                            st.metric("市值", f"${market_cap:,.0f}")
-                    else:
-                        # 嘗試計算市值
-                        shares = analyzer.info.get('sharesOutstanding', None)
-                        if not analyzer.hist.empty and shares:
-                            price = analyzer.hist['Close'].iloc[-1]
-                            calc_market_cap = shares * price
-                            if calc_market_cap >= 1e9:
-                                st.metric("市值", f"${calc_market_cap/1e9:.2f}B")
-                            else:
-                                st.metric("市值", f"${calc_market_cap/1e6:.2f}M")
-                        else:
-                            st.metric("市值", "N/A")
-                except Exception as e:
-                    st.metric("市值", "N/A")
-            
+# 關鍵指標卡片
+st.markdown("### 📊 關鍵指標")
+
+# 先確保有歷史數據
+if len(analyzer.hist) == 0:
+    st.warning("無法取得股價數據，請檢查股票代碼")
+    return
+
+# 先計算財務比率
+try:
+    ratios = analyzer.calculate_financial_ratios()
+except Exception as e:
+    st.warning(f"計算財務比率時發生錯誤: {e}")
+    ratios = {}
+
+# 建立六個欄位 - 簡化版本
+metrics_cols = st.columns(6)
+
+# 指標 1: 現價 (確保顯示)
+with metrics_cols[0]:
+    try:
+        current_price = float(analyzer.hist['Close'].iloc[-1])
+        if len(analyzer.hist) > 1:
+            prev_close = float(analyzer.hist['Close'].iloc[-2])
+            price_change_pct = ((current_price - prev_close) / prev_close) * 100
+        else:
+            price_change_pct = 0.0
+        
+        st.metric(
+            "現價",
+            f"${current_price:.2f}",
+            f"{price_change_pct:+.2f}%"
+        )
+    except:
+        st.metric("現價", "N/A", "0.00%")
+
+# 指標 2: 本益比 (簡化檢查)
+with metrics_cols[1]:
+    try:
+        pe_ratio = analyzer.info.get('trailingPE')
+        if pe_ratio and pe_ratio > 0:
+            st.metric("本益比 (P/E)", f"{float(pe_ratio):.2f}")
+        else:
+            st.metric("本益比 (P/E)", "N/A")
+    except:
+        st.metric("本益比 (P/E)", "N/A")
+
+# 指標 3: 股價淨值比 (簡化檢查)
+with metrics_cols[2]:
+    try:
+        pb_ratio = analyzer.info.get('priceToBook')
+        if pb_ratio and pb_ratio > 0:
+            st.metric("股價淨值比 (P/B)", f"{float(pb_ratio):.2f}")
+        else:
+            st.metric("股價淨值比 (P/B)", "N/A")
+    except:
+        st.metric("股價淨值比 (P/B)", "N/A")
+
+# 指標 4: ROE (從多個來源嘗試)
+with metrics_cols[3]:
+    try:
+        # 嘗試從 info 取得
+        roe_info = analyzer.info.get('returnOnEquity')
+        if roe_info and roe_info > 0:
+            st.metric("ROE", f"{float(roe_info)*100:.1f}%")
+        else:
+            # 嘗試從計算比率取得
+            roe_calc = ratios.get('ROE')
+            if roe_calc and not pd.isna(roe_calc):
+                st.metric("ROE", f"{float(roe_calc):.1f}%")
+            else:
+                st.metric("ROE", "N/A")
+    except:
+        st.metric("ROE", "N/A")
+
+# 指標 5: 股息率 (多來源檢查)
+with metrics_cols[4]:
+    try:
+        # 優先從 info 取得
+        dividend_yield = analyzer.info.get('dividendYield')
+        if dividend_yield and dividend_yield > 0:
+            st.metric("股息率", f"{float(dividend_yield)*100:.2f}%")
+        else:
+            # 從 trailing yield 取得
+            trailing_yield = analyzer.info.get('trailingAnnualDividendYield')
+            if trailing_yield and trailing_yield > 0:
+                st.metric("股息率", f"{float(trailing_yield)*100:.2f}%")
+            else:
+                st.metric("股息率", "0.00%")
+    except:
+        st.metric("股息率", "0.00%")
+
+# 指標 6: 市值 (確保顯示)
+with metrics_cols[5]:
+    try:
+        market_cap = analyzer.info.get('marketCap')
+        if market_cap and market_cap > 0:
+            market_cap = float(market_cap)
+            if market_cap >= 1e12:
+                st.metric("市值", f"${market_cap/1e12:.2f}T")
+            elif market_cap >= 1e9:
+                st.metric("市值", f"${market_cap/1e9:.2f}B")
+            elif market_cap >= 1e6:
+                st.metric("市值", f"${market_cap/1e6:.2f}M")
+            else:
+                st.metric("市值", f"${market_cap:,.0f}")
+        else:
+            # 嘗試計算市值
+            shares = analyzer.info.get('sharesOutstanding')
+            current_price = analyzer.hist['Close'].iloc[-1]
+            if shares and current_price:
+                calc_market_cap = float(shares) * float(current_price)
+                if calc_market_cap >= 1e9:
+                    st.metric("市值", f"${calc_market_cap/1e9:.2f}B")
+                else:
+                    st.metric("市值", f"${calc_market_cap/1e6:.2f}M")
+            else:
+                st.metric("市值", "N/A")
+    except:
+        st.metric("市值", "N/A")            
             # 標籤頁
             tab1, tab2, tab3, tab4 = st.tabs(["📈 價格走勢", "🔧 技術分析", "💰 財務分析", "📊 詳細數據"])
             
