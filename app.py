@@ -320,25 +320,28 @@ def main():
                 st.warning(f"計算財務比率時發生錯誤: {e}")
                 ratios = {}
             
-            # 建立六個欄位
+            # 建立六個欄位 - 修正指標顯示
             metrics_cols = st.columns(6)
             
             # 指標 1: 現價
             with metrics_cols[0]:
                 try:
-                    current_price = analyzer.hist['Close'].iloc[-1]
-                    if len(analyzer.hist) > 1:
-                        prev_close = analyzer.hist['Close'].iloc[-2]
-                        price_change = current_price - prev_close
-                        price_change_pct = (price_change / prev_close) * 100 if prev_close != 0 else 0
+                    if not analyzer.hist.empty:
+                        current_price = analyzer.hist['Close'].iloc[-1]
+                        if len(analyzer.hist) > 1:
+                            prev_close = analyzer.hist['Close'].iloc[-2]
+                            price_change = current_price - prev_close
+                            price_change_pct = (price_change / prev_close) * 100 if prev_close != 0 else 0
+                        else:
+                            price_change_pct = 0
+                        
+                        st.metric(
+                            "現價",
+                            f"${current_price:.2f}",
+                            f"{price_change_pct:+.2f}%" if price_change_pct != 0 else "0.00%"
+                        )
                     else:
-                        price_change_pct = 0
-                    
-                    st.metric(
-                        "現價",
-                        f"${current_price:.2f}",
-                        f"{price_change_pct:+.2f}%" if price_change_pct != 0 else "0.00%"
-                    )
+                        st.metric("現價", "N/A", "0.00%")
                 except Exception as e:
                     st.metric("現價", "載入中...", "--")
             
@@ -346,65 +349,66 @@ def main():
             with metrics_cols[1]:
                 try:
                     pe_ratio = analyzer.info.get('trailingPE', None)
-                    if pe_ratio and not np.isnan(pe_ratio) and pe_ratio > 0:
+                    if pe_ratio and not pd.isna(pe_ratio) and pe_ratio > 0:
                         st.metric("本益比 (P/E)", f"{pe_ratio:.2f}")
                     else:
                         # 嘗試從 ratios 取得
                         pe_from_ratios = ratios.get('P/E', None)
-                        if pe_from_ratios and not np.isnan(pe_from_ratios) and pe_from_ratios > 0:
+                        if pe_from_ratios and not pd.isna(pe_from_ratios) and pe_from_ratios > 0:
                             st.metric("本益比 (P/E)", f"{pe_from_ratios:.2f}")
                         else:
                             st.metric("本益比 (P/E)", "N/A")
                 except Exception as e:
-                    st.metric("本益比 (P/E)", "載入中...")
+                    st.metric("本益比 (P/E)", "N/A")
             
             # 指標 3: 股價淨值比
             with metrics_cols[2]:
                 try:
                     pb_ratio = analyzer.info.get('priceToBook', None)
-                    if pb_ratio and not np.isnan(pb_ratio) and pb_ratio > 0:
+                    if pb_ratio and not pd.isna(pb_ratio) and pb_ratio > 0:
                         st.metric("股價淨值比 (P/B)", f"{pb_ratio:.2f}")
                     else:
                         # 嘗試從 ratios 取得
                         pb_from_ratios = ratios.get('P/B', None)
-                        if pb_from_ratios and not np.isnan(pb_from_ratios) and pb_from_ratios > 0:
+                        if pb_from_ratios and not pd.isna(pb_from_ratios) and pb_from_ratios > 0:
                             st.metric("股價淨值比 (P/B)", f"{pb_from_ratios:.2f}")
                         else:
                             st.metric("股價淨值比 (P/B)", "N/A")
                 except Exception as e:
-                    st.metric("股價淨值比 (P/B)", "載入中...")
+                    st.metric("股價淨值比 (P/B)", "N/A")
             
             # 指標 4: ROE
             with metrics_cols[3]:
                 try:
                     roe = ratios.get('ROE', None)
-                    if roe and not np.isnan(roe):
+                    if roe and not pd.isna(roe):
                         st.metric("ROE", f"{roe:.1f}%")
                     else:
                         # 嘗試從 info 直接取得
                         roe_info = analyzer.info.get('returnOnEquity', None)
-                        if roe_info and not np.isnan(roe_info):
+                        if roe_info and not pd.isna(roe_info):
                             st.metric("ROE", f"{roe_info*100:.1f}%")
                         else:
                             st.metric("ROE", "N/A")
                 except Exception as e:
-                    st.metric("ROE", "載入中...")
+                    st.metric("ROE", "N/A")
             
             # 指標 5: 股息率
             with metrics_cols[4]:
                 try:
                     dividend_yield = analyzer.info.get('dividendYield', None)
-                    if dividend_yield and not np.isnan(dividend_yield) and dividend_yield > 0:
+                    if dividend_yield and not pd.isna(dividend_yield) and dividend_yield > 0:
                         st.metric("股息率", f"{dividend_yield*100:.2f}%")
                     else:
                         # 嘗試其他欄位
                         trailing_yield = analyzer.info.get('trailingAnnualDividendYield', None)
-                        if trailing_yield and not np.isnan(trailing_yield) and trailing_yield > 0:
+                        if trailing_yield and not pd.isna(trailing_yield) and trailing_yield > 0:
                             st.metric("股息率", f"{trailing_yield*100:.2f}%")
                         else:
-                            st.metric("股息率", "0.00%")
+                            dividend_rate = ratios.get('股息率', 0)
+                            st.metric("股息率", f"{dividend_rate:.2f}%")
                 except Exception as e:
-                    st.metric("股息率", "載入中...")
+                    st.metric("股息率", "0.00%")
             
             # 指標 6: 市值
             with metrics_cols[5]:
@@ -422,8 +426,8 @@ def main():
                     else:
                         # 嘗試計算市值
                         shares = analyzer.info.get('sharesOutstanding', None)
-                        price = analyzer.hist['Close'].iloc[-1] if len(analyzer.hist) > 0 else None
-                        if shares and price:
+                        if not analyzer.hist.empty and shares:
+                            price = analyzer.hist['Close'].iloc[-1]
                             calc_market_cap = shares * price
                             if calc_market_cap >= 1e9:
                                 st.metric("市值", f"${calc_market_cap/1e9:.2f}B")
@@ -432,15 +436,7 @@ def main():
                         else:
                             st.metric("市值", "N/A")
                 except Exception as e:
-                    st.metric("市值", "載入中...")
-            
-            # 除錯資訊（可選，發布時可移除）
-            with st.expander("🔧 除錯資訊", expanded=False):
-                st.write("**可用的 info 欄位:**")
-                available_fields = [k for k, v in analyzer.info.items() if v is not None and v != 'N/A']
-                st.write(available_fields[:20])  # 只顯示前20個
-                st.write("**計算出的比率:**")
-                st.write(ratios)
+                    st.metric("市值", "N/A")
             
             # 標籤頁
             tab1, tab2, tab3, tab4 = st.tabs(["📈 價格走勢", "🔧 技術分析", "💰 財務分析", "📊 詳細數據"])
@@ -672,6 +668,9 @@ def main():
                             rsi_status = "超買" if rsi_value > 70 else "超賣" if rsi_value < 30 else "正常"
                             st.write(f"RSI: {rsi_value:.2f} ({rsi_status})")
                         
+                        if show_macd and 'MACD' in tech_df.columns and pd.notna(latest_data['MACD']):
+                            macd_signal = "買入訊號" if latest_data['MACD'] > latest_data['Signal'] else "賣出訊號"
+                            st.write(f"MACD: {macd_signal}")
                 else:
                     st.warning("無法計算技術指標")
             
